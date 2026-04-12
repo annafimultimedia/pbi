@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard Data GC PBI</title>
+    <meta charset="UTF-8">
+
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Poppins', sans-serif; background:#f4f6f9; padding:20px; }
+        .container{ max-width:1200px; margin:auto; }
+        .topbar{ display:flex; justify-content:space-between; margin-bottom:20px; }
+        input,button{ padding:8px; border-radius:8px; border:1px solid #ccc; }
+        button{ background:#4CAF50; color:white; border:none; cursor:pointer; }
+
+        .cards{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:15px; margin-bottom:20px; }
+        .card{ background:white; padding:20px; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,0.05);} 
+
+        .box{ background:white; padding:15px; border-radius:12px; margin-bottom:20px; box-shadow:0 4px 10px rgba(0,0,0,0.05);} 
+
+        table{ width:100%; border-collapse:collapse; margin-top:10px; }
+        th,td{ padding:8px; font-size:13px; }
+        th{ background:#4CAF50; color:white; }
+        tr:nth-child(even){ background:#f9f9f9; }
+    </style>
+</head>
+
+<body>
+<div class="container">
+
+<div class="topbar">
+<h2>📊 Dashboard Data GC PBI</h2>
+<div>
+<input type="file" id="fileInput">
+<input type="text" id="search" placeholder="Cari...">
+<button onclick="exportExcel()">Export Excel</button>
+</div>
+</div>
+
+<div class="cards">
+<div class="card"><h3>Total KK</h3><p id="totalKK">0</p></div>
+<div class="card"><h3>Total ART</h3><p id="totalART">0</p></div>
+</div>
+
+<div class="box">
+<h3>📍 Rekap per Desa</h3>
+<table id="rekapDesa">
+<thead><tr><th>Desa</th><th>KK</th><th>ART</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+
+<div class="box">
+<h3>📋 Data Detail</h3>
+<table id="dataTable">
+<thead>
+<tr>
+<th>No</th><th>Nama</th><th>NIK</th><th>No KK</th>
+<th>Alamat</th><th>RT</th><th>RW</th><th>Desa</th>
+<th>Nama ART</th><th>Jumlah ART</th><th>Bansos</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+
+</div>
+
+<script>
+let globalData = [];
+let currentUserFullname = "Data";
+
+// ======================
+function getValue(data, key) {
+    let obj = data.find(d => d.dataKey === key);
+    return obj ? obj.answer : "";
+}
+
+// ======================
+// FIX RT RW + FORMAT 3 DIGIT
+function extractRTRW(text) {
+    if (!text) return { rt: "-", rw: "-" };
+
+    text = text.toString();
+
+    let rtMatch = text.match(/RT\s*0*(\d+)/i);
+    let rwMatch = text.match(/RW\s*0*(\d+)/i);
+
+    let rt = rtMatch ? rtMatch[1] : "-";
+    let rw = rwMatch ? rwMatch[1] : "-";
+
+    // format 3 digit
+    if (rt !== "-") rt = rt.toString().padStart(3, "0");
+    if (rw !== "-") rw = rw.toString().padStart(3, "0");
+
+    return { rt, rw };
+}
+
+// ======================
+document.getElementById('fileInput').addEventListener('change', function(e) {
+    const reader = new FileReader();
+
+    reader.onload = function(event) {
+        const json = JSON.parse(event.target.result);
+        globalData = [];
+
+        if (json.length > 0) {
+            currentUserFullname = json[0].currentUserFullname || "Data";
+        }
+
+        json.forEach((item, index) => {
+            let predata = JSON.parse(item.preDefinedData).predata;
+
+            let nama = getValue(predata, "nama_kepala_keluarga");
+            let nik = getValue(predata, "nik_kepala_keluarga");
+            let kk = getValue(predata, "kartu_keluarga");
+            let alamat = getValue(predata, "alamat");
+            let desa = getValue(predata, "kelurahan_desa");
+            let jumlahART = parseInt(getValue(predata, "jumlah_anggota_keluarga_pre")) || 0;
+
+            // ART
+            let artList = getValue(predata, "ak_prelist");
+            let artNama = "";
+            if (Array.isArray(artList)) {
+                artNama = artList.map(a => a.label).join(", ");
+            }
+
+            // BANSOS
+            let bansosList = [];
+            if (getValue(predata, "pbi_nas") == 1) bansosList.push("PBI NAS");
+            if (getValue(predata, "pbi_pemda") == 1) bansosList.push("PBI PEMDA");
+            let bansos = bansosList.length ? bansosList.join(", ") : "TIDAK";
+
+            // SUMBER RT RW PALING LENGKAP
+            let sumberRTRW =
+                getValue(predata, "nama_sls") ||
+                getValue(predata, "alamat_namasls") ||
+                item.region_level1_level2_level3_level4_level5_name ||
+                item.region_level1_level2_level3_level4_level5_level6_name ||
+                alamat;
+
+            let rtrw = extractRTRW(sumberRTRW);
+
+            globalData.push({
+                no: index + 1,
+                nama, nik, kk, alamat,
+                rt: rtrw.rt,
+                rw: rtrw.rw,
+                desa,
+                artNama,
+                jumlahART,
+                bansos
+            });
+        });
+
+        renderAll();
+    };
+
+    reader.readAsText(e.target.files[0]);
+});
+
+// ======================
+function renderAll() {
+    renderTable(globalData);
+    renderDashboard();
+    renderRekapDesa();
+}
+
+// ======================
+function renderTable(data) {
+    let tbody = document.querySelector("#dataTable tbody");
+    tbody.innerHTML = "";
+
+    data.forEach((d, i) => {
+        tbody.innerHTML += `
+        <tr>
+        <td>${i+1}</td><td>${d.nama}</td><td>${d.nik}</td>
+        <td>${d.kk}</td><td>${d.alamat}</td>
+        <td>${d.rt}</td><td>${d.rw}</td>
+        <td>${d.desa}</td><td>${d.artNama}</td>
+        <td>${d.jumlahART}</td><td>${d.bansos}</td>
+        </tr>`;
+    });
+}
+
+// ======================
+function renderDashboard() {
+    document.getElementById("totalKK").innerText = globalData.length;
+    document.getElementById("totalART").innerText = globalData.reduce((a,b)=>a+b.jumlahART,0);
+}
+
+// ======================
+function renderRekapDesa() {
+    let map = {};
+
+    globalData.forEach(d => {
+        if (!map[d.desa]) map[d.desa] = { kk:0, art:0 };
+        map[d.desa].kk++;
+        map[d.desa].art += d.jumlahART;
+    });
+
+    let tbody = document.querySelector("#rekapDesa tbody");
+    tbody.innerHTML = "";
+
+    for (let desa in map) {
+        tbody.innerHTML += `<tr>
+            <td>${desa}</td>
+            <td>${map[desa].kk}</td>
+            <td>${map[desa].art}</td>
+        </tr>`;
+    }
+}
+
+// ======================
+document.getElementById('search').addEventListener('keyup', function() {
+    let key = this.value.toLowerCase();
+
+    let filtered = globalData.filter(d =>
+        d.nama.toLowerCase().includes(key) ||
+        d.nik.toLowerCase().includes(key) ||
+        d.desa.toLowerCase().includes(key)
+    );
+
+    renderTable(filtered);
+});
+
+// ======================
+function exportExcel() {
+    let wb = XLSX.utils.book_new();
+
+    let ws1 = XLSX.utils.json_to_sheet(globalData);
+    XLSX.utils.book_append_sheet(wb, ws1, "Data");
+
+    let desaMap = {};
+    globalData.forEach(d => {
+        if (!desaMap[d.desa]) desaMap[d.desa] = {Desa:d.desa, KK:0, ART:0};
+        desaMap[d.desa].KK++;
+        desaMap[d.desa].ART += d.jumlahART;
+    });
+
+    let ws2 = XLSX.utils.json_to_sheet(Object.values(desaMap));
+    XLSX.utils.book_append_sheet(wb, ws2, "Rekap Desa");
+
+    let safeName = currentUserFullname.replace(/[^\w\s]/gi, '').trim();
+    let fileName = safeName + " GroundCheck PBI.xlsx";
+
+    XLSX.writeFile(wb, fileName);
+}
+</script>
+
+</body>
+</html>
