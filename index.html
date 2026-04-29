@@ -59,7 +59,7 @@
 <th>No</th><th>Nama</th><th>NIK</th><th>No KK</th>
 <th>Alamat</th><th>RT</th><th>RW</th><th>Desa</th>
 <th>Nama ART</th><th>Jumlah ART</th><th>Bansos</th>
-<th>Status</th><th>Assignment</th>
+<th>Status Data4</th><th>Assignment</th>
 </tr>
 </thead>
 <tbody></tbody>
@@ -131,11 +131,11 @@ document.getElementById('fileInput').addEventListener('change', function(e) {
             if (getValue(predata, "pbi_pemda") == 1) bansosList.push("PBI PEMDA");
             let bansos = bansosList.length ? bansosList.join(", ") : "TIDAK";
 
-            // STATUS TAMBAHAN
-            let status_data4 = item.status_data4 || "";
-            let assignment = item.AssigmentStatusAlias || "";
+            // ✅ FIX FINAL SESUAI JSON
+            let status_data4 = item.data4 ? item.data4 : "BELUM DIISI";
+            let assignment = item.assignmentStatusAlias || "UNKNOWN";
 
-            // SUMBER RT RW
+            // RT RW
             let sumberRTRW =
                 getValue(predata, "nama_sls") ||
                 getValue(predata, "alamat_namasls") ||
@@ -185,8 +185,8 @@ function renderTable(data) {
         <td>${d.rt}</td><td>${d.rw}</td>
         <td>${d.desa}</td><td>${d.artNama}</td>
         <td>${d.jumlahART}</td><td>${d.bansos}</td>
-        <td>${d.status_data4 || ""}</td>
-        <td>${d.assignment || ""}</td>
+        <td>${d.status_data4}</td>
+        <td>${d.assignment}</td>
         </tr>`;
     });
 }
