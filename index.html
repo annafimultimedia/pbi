@@ -43,6 +43,7 @@
 <div class="card"><h3>Total ART</h3><p id="totalART">0</p></div>
 </div>
 
+<!-- REKAP DESA -->
 <div class="box">
 <h3>📍 Rekap per Desa</h3>
 <table id="rekapDesa">
@@ -51,6 +52,21 @@
 </table>
 </div>
 
+<!-- REKAP ASSIGNMENT -->
+<div class="box">
+<h3>📊 Rekap Assignment Status</h3>
+<table id="rekapAssignment">
+<thead>
+<tr>
+<th>Status</th>
+<th>Jumlah</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+
+<!-- DATA DETAIL -->
 <div class="box">
 <h3>📋 Data Detail</h3>
 <table id="dataTable">
@@ -59,7 +75,7 @@
 <th>No</th><th>Nama</th><th>NIK</th><th>No KK</th>
 <th>Alamat</th><th>RT</th><th>RW</th><th>Desa</th>
 <th>Nama ART</th><th>Jumlah ART</th><th>Bansos</th>
-<th>Status</th><th>Assignment</th>
+<th>Status Data4</th><th>Assignment</th>
 </tr>
 </thead>
 <tbody></tbody>
@@ -131,7 +147,7 @@ document.getElementById('fileInput').addEventListener('change', function(e) {
             if (getValue(predata, "pbi_pemda") == 1) bansosList.push("PBI PEMDA");
             let bansos = bansosList.length ? bansosList.join(", ") : "TIDAK";
 
-            // ✅ FIX FINAL SESUAI JSON
+            // ✅ FIX DATA
             let status_data4 = item.data4 ? item.data4 : "BELUM DIISI";
             let assignment = item.assignmentStatusAlias || "UNKNOWN";
 
@@ -170,6 +186,7 @@ function renderAll() {
     renderTable(globalData);
     renderDashboard();
     renderRekapDesa();
+    renderRekapAssignment();
 }
 
 // ======================
@@ -220,6 +237,29 @@ function renderRekapDesa() {
 }
 
 // ======================
+function renderRekapAssignment() {
+    let map = {};
+
+    globalData.forEach(d => {
+        let key = d.assignment || "UNKNOWN";
+
+        if (!map[key]) map[key] = 0;
+        map[key]++;
+    });
+
+    let tbody = document.querySelector("#rekapAssignment tbody");
+    tbody.innerHTML = "";
+
+    for (let status in map) {
+        tbody.innerHTML += `
+        <tr>
+            <td>${status}</td>
+            <td>${map[status]}</td>
+        </tr>`;
+    }
+}
+
+// ======================
 document.getElementById('search').addEventListener('keyup', function() {
     let key = this.value.toLowerCase();
 
@@ -248,6 +288,16 @@ function exportExcel() {
 
     let ws2 = XLSX.utils.json_to_sheet(Object.values(desaMap));
     XLSX.utils.book_append_sheet(wb, ws2, "Rekap Desa");
+
+    let assignMap = {};
+    globalData.forEach(d => {
+        let key = d.assignment || "UNKNOWN";
+        if (!assignMap[key]) assignMap[key] = {Status:key, Jumlah:0};
+        assignMap[key].Jumlah++;
+    });
+
+    let ws3 = XLSX.utils.json_to_sheet(Object.values(assignMap));
+    XLSX.utils.book_append_sheet(wb, ws3, "Rekap Assignment");
 
     let safeName = currentUserFullname.replace(/[^\w\s]/gi, '').trim();
     let fileName = safeName + " GroundCheck PBI.xlsx";
